@@ -50,18 +50,19 @@ void it_routine(void)
 	{
 		INTCONbits.TMR0IF = 0;
 		i++;
-		if(i == 8) // reading inputs every 1.024ms
+		if(i == 79) // reading inputs every 10.112 ms
 		{
 			// Reading Ports
 			sensor_state = ((PORTB & 0xF0) >> 4); 
+			sendData(sensor_state);
 			if(Led_State == 0)
 			{
-				PORTB = 0b00000001;
+				PORTB |= 0b00000001;
 				Led_State = 1;
 			}
 			else
 			{
-				PORTB = 0b00000000;
+				PORTB &= 0b11111110;
 				Led_State = 0;
 			}
 		i = 0;
@@ -73,4 +74,14 @@ void it_routine(void)
 void it_saut(void)
 {
 _asm goto it_routine _endasm
+}
+
+
+#pragma code
+void sendData(unsigned char data)
+{
+	if(TXSTAbits.TRMT == 1)
+	{
+		TXREG = data;
+	}
 }

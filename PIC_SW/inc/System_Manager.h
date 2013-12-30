@@ -26,5 +26,6 @@
  *
  ***************************************************************/
  void it_routine(void);
+ void sendData(unsigned char data);
 
 #endif//_SYSTEM_MANAGER_H_

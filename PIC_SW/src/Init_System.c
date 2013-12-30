@@ -39,13 +39,29 @@ void init_System(void)
 
 	// Config Input pin for ultrason sensor
 	TRISBbits.TRISB4 = 1;
-	
-	// Ports for USART/UART/serial communication
-	TRISCbits.TRISC7 = 0; // RX
-	TRISCbits.TRISC6 = 1; // TX
 
 	// Config for Serial comm
 	// Ports for development board ICD2 leds for tests
 	TRISBbits.TRISB0 = 0;
 	PORTB = 0;
+
+	// Config for serial communication
+	// Ports for USART/UART/serial communication
+	TRISCbits.TRISC7 = 0; // RX
+	TRISCbits.TRISC6 = 1; // TX	
+
+	// Baudrate config
+	BAUDCONbits.BRG16 = 0;	// 8-bit baudrate generator
+	BAUDCONbits.ABDEN = 0;	// Disable auto-baud detect
+	SPBRG = 0x33;			// 9600 bauds (ERROR = 0.16%)
+
+	// RX register control
+	RCSTAbits.SPEN = 1;		// Enable TX and RX as serial port pins
+	RCSTAbits.CREN = 0;		// Disable receiver	
+
+	// TX register control
+	TXSTAbits.TX9 = 0;		// 8 bits transmission
+	TXSTAbits.SYNC = 0;		// Asyschronous mode
+	TXSTAbits.BRGH = 1;		// High speed
+	TXSTAbits.TXEN = 1; 	// TX enable
 }
