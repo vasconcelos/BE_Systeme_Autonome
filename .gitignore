@@ -5,4 +5,4 @@ PIC_SW/out/*
 NMakefile
 Makefile
 main.err
-High_level_SW/*
+PYTHON_SW/lib*
