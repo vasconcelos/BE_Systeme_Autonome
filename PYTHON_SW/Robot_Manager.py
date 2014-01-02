@@ -1,3 +1,27 @@
+################################################################
+## BE Systèmes Autonomes         						      ##
+## Created by Joao VASCONCELOS	 							  ##
+## Date: 23/12/2013				 							  ##
+##								 							  ##
+## File: Robot_Manager.py			 					   	  ##
+## Description: This file contains the folowing thread:		  ##
+##			   - Thread1 = CommWatcher (serial comm)		  ##
+##			   - Thread2 = Robot Manager 					  ##
+##			   - Main thread = GUI (main app)				  ##
+##			   All those threads are required by the app	  ##
+##			   to works normaly								  ##
+################################################################
+ 
+ 
+## TODO: Faire l'algo pour commander le robot
+
+ 
+ 
+################################################################
+##
+## IMPORTED MODULES
+##
+################################################################
 import threading, sys, os, time, math
 import serial
 from Tkinter import*
@@ -5,12 +29,19 @@ import Tkinter
 import tkMessageBox
 from ScrolledText import *
 
-#### Serial communication class (Thread)
+
+
+################################################################
+##
+## Serial communication class (Thread1)
+##
+################################################################
 class ManagerCommThread(threading.Thread):
-    def __init__(self, threadID): ##redefine Thread constructor
-        threading.Thread.__init__(self) ## call parent constructor
+    ##Constructor
+    def __init__(self, threadID):
+        threading.Thread.__init__(self)
         self.threadID = threadID
-        self.comm = SerialComm(9600,0.05)
+        self.comm = SerialComm(9600,0.2)
         self.comm.findPort()
         s1.acquire()
         self.running = False
@@ -25,9 +56,9 @@ class ManagerCommThread(threading.Thread):
         j = 0
         while j < 1:
             x = self.comm.read()
-            convert = ":".join("{0:x}".format(ord(c)) for c in x)
             s.release()
             s1.acquire()
+            thread2.sensorValue = x ##self.sensorCapture
             if self.running == False:
                 j = 2
             s1.release()
@@ -44,8 +75,14 @@ class ManagerCommThread(threading.Thread):
         s1.release()
 
 
-#### Serial communication configuration class
+		
+################################################################
+##
+## Serial communication configuration class
+##
+################################################################
 class SerialComm(serial.Serial):
+    ##Constructor
     def __init__(self, baudrate, timeout):
         serial.Serial.__init__(self)
         self.baudrate = baudrate
@@ -66,18 +103,30 @@ class SerialComm(serial.Serial):
         return
     
 
-## Control robot manager (Thread)
+	
+	
+################################################################
+##
+## Control robot manager (Thread2)
+##
+################################################################
 class RobotControl(threading.Thread):
-    def __init__(self, threadID): ##redefine Thread constructor
-        threading.Thread.__init__(self) ## call parent constructor
+    ##Constructor
+    def __init__(self, threadID):
+        threading.Thread.__init__(self)
         self.threadID = threadID
         s1.acquire()
+        self.sensorValue = 0x00
         self.running = False
         s1.release()
         s.acquire()
         return
     
     def run(self):
+        app.can.itemconfigure(app.capt1,fill='black')
+        app.can.itemconfigure(app.capt2,fill='black')
+        app.can.itemconfigure(app.capt3,fill='black')
+        app.can.itemconfigure(app.capt4,fill='black')
         s1.acquire()
         self.running = True
         s1.release()
@@ -91,11 +140,28 @@ class RobotControl(threading.Thread):
             else:
                 s1.release()
                 s.acquire()
-                app.text.insert(END, "Converted value: %i\n"  %convert)
-            if(convert == 0):
+            if ord(self.sensorValue) == 0:
                 app.can.itemconfigure(app.capt1,fill='black')
                 app.can.itemconfigure(app.capt2,fill='black')
                 app.can.itemconfigure(app.capt3,fill='black')
+                app.can.itemconfigure(app.capt4,fill='black')
+                ## control the robot here
+            if ord(self.sensorValue) == 1:
+                app.can.itemconfigure(app.capt1,fill='red')
+                app.can.itemconfigure(app.capt2,fill='black')
+                app.can.itemconfigure(app.capt3,fill='black')
+                app.can.itemconfigure(app.capt4,fill='black')
+
+            if ord(self.sensorValue) == 2:
+                app.can.itemconfigure(app.capt1,fill='black')
+                app.can.itemconfigure(app.capt2,fill='red')
+                app.can.itemconfigure(app.capt3,fill='black')
+                app.can.itemconfigure(app.capt4,fill='black')
+
+            if ord(self.sensorValue) == 3:
+                app.can.itemconfigure(app.capt1,fill='black')
+                app.can.itemconfigure(app.capt2,fill='black')
+                app.can.itemconfigure(app.capt3,fill='red')
                 app.can.itemconfigure(app.capt4,fill='black')
                 
         app.text.insert(END, "End of " + self.threadID + " thread\n")
@@ -111,8 +177,16 @@ class RobotControl(threading.Thread):
         self.running = False
         s1.release()
 
-## GUI configurations class
+
+		
+
+################################################################
+##
+## GUI configurations and manager class
+##
+################################################################
 class Interface(Frame):
+    ##Constructor
     def __init__(self,master=None):
         Frame.__init__(self,master)
         self.pack()
@@ -120,6 +194,7 @@ class Interface(Frame):
         self.threadsRunning = 0
         return
 
+    ## GUI Config
     def initializeGUI(self):
         f1 = Frame(self)
         f1.pack(side=LEFT,padx=5)
@@ -157,13 +232,17 @@ class Interface(Frame):
         dia= 20
 
         #create rectangles for the infra-red sensores along with circle for ultrasonic sensor
+        ## Ultrason sensor
         self.capt4 = self.can.create_oval(x,y+60,x+dia,y+dia+60, fill='red',width=2)
+        ## Right IR sensor
         self.capt3 = self.can.create_rectangle(x-70,y,x+dia-70,y+dia, fill='red',width=2)
+        ## Left IR sensor
         self.capt2 = self.can.create_rectangle(x+70,y,x+dia+70,y+dia, fill='red',width=2)
+        ## center IR sensor
         self.capt1 = self.can.create_rectangle(x,y,x+dia,y+dia,fill='red',width=2)
         return
 
-
+    ## System config
     def initSystem(self):
         # Create new thread
         global thread1
@@ -213,18 +292,23 @@ class Interface(Frame):
         return
 
 
-## main app
-convert = 0
+		
+################################################################
+##
+## main app (main thread)
+##
+################################################################
+#Semaphores
 s = threading.Semaphore()
 s1 = threading.Semaphore()
+#GUI
 mainWindow = Tk()
 mainWindow.title("BE Systèmes Autonomes")
 app = Interface(master = mainWindow)
 app.text.insert(END, "Main app thread is ready\n")
 app.mainloop()
+
+# if quit
 if app.threadsRunning == 1:
     thread1.stop()
     thread2.stop()
-
-#app.text.insert(END, "End of main app\n")
-#app.destroy()
