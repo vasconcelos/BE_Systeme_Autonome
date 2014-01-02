@@ -10,7 +10,7 @@ class ManagerCommThread(threading.Thread):
     def __init__(self, threadID): ##redefine Thread constructor
         threading.Thread.__init__(self) ## call parent constructor
         self.threadID = threadID
-        self.comm = SerialComm(9600,2)
+        self.comm = SerialComm(9600,0.05)
         self.comm.findPort()
         s1.acquire()
         self.running = False
@@ -92,6 +92,12 @@ class RobotControl(threading.Thread):
                 s1.release()
                 s.acquire()
                 app.text.insert(END, "Converted value: %i\n"  %convert)
+            if(convert == 0):
+                app.can.itemconfigure(app.capt1,fill='black')
+                app.can.itemconfigure(app.capt2,fill='black')
+                app.can.itemconfigure(app.capt3,fill='black')
+                app.can.itemconfigure(app.capt4,fill='black')
+                
         app.text.insert(END, "End of " + self.threadID + " thread\n")
         s1.acquire()
         app.threadsRunning = 0
@@ -151,7 +157,7 @@ class Interface(Frame):
         dia= 20
 
         #create rectangles for the infra-red sensores along with circle for ultrasonic sensor
-        self.capt4 = self.can.create_oval(x,y+60,x+dia,y+dia+60, fill='dark olive green',width=2)
+        self.capt4 = self.can.create_oval(x,y+60,x+dia,y+dia+60, fill='red',width=2)
         self.capt3 = self.can.create_rectangle(x-70,y,x+dia-70,y+dia, fill='red',width=2)
         self.capt2 = self.can.create_rectangle(x+70,y,x+dia+70,y+dia, fill='red',width=2)
         self.capt1 = self.can.create_rectangle(x,y,x+dia,y+dia,fill='red',width=2)
@@ -199,6 +205,7 @@ class Interface(Frame):
         if app.threadsRunning == 1:
             s1.release()
             self.stop()
+            time.sleep(2)
 
         s1.release()
         mainWindow.destroy()
