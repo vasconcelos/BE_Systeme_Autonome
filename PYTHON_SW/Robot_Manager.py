@@ -42,7 +42,6 @@ class ManagerCommThread(threading.Thread):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.comm = SerialComm(9600,0.2)
-        self.comm.findPort()
         s1.acquire()
         self.running = False
         s1.release()
@@ -98,8 +97,17 @@ class SerialComm(serial.Serial):
             try:
                 self.open()
                 port_founded = 2
+                s2.acquire()
+                app.CommFound = 1
+                s2.release()
             except:
                 self.port = i
+                if i == 5000:
+                    port_founded = 2
+                    s2.acquire()
+                    app.CommFound = 0
+                    s2.release()
+                    app.text.insert(END,"ERROR: Serial port not found\n")
         return
     
 
@@ -123,6 +131,7 @@ class RobotControl(threading.Thread):
         return
     
     def run(self):
+        app.text.insert(END, "Starting thread: " + self.threadID + "\n")
         app.can.itemconfigure(app.capt1,fill='black')
         app.can.itemconfigure(app.capt2,fill='black')
         app.can.itemconfigure(app.capt3,fill='black')
@@ -130,7 +139,6 @@ class RobotControl(threading.Thread):
         s1.acquire()
         self.running = True
         s1.release()
-        app.text.insert(END, "Starting thread: " + self.threadID + "\n")
         k = 0
         while k < 1:
             s1.acquire()
@@ -140,29 +148,34 @@ class RobotControl(threading.Thread):
             else:
                 s1.release()
                 s.acquire()
-            if ord(self.sensorValue) == 0:
-                app.can.itemconfigure(app.capt1,fill='black')
-                app.can.itemconfigure(app.capt2,fill='black')
-                app.can.itemconfigure(app.capt3,fill='black')
-                app.can.itemconfigure(app.capt4,fill='black')
-                ## control the robot here
-            if ord(self.sensorValue) == 1:
-                app.can.itemconfigure(app.capt1,fill='red')
-                app.can.itemconfigure(app.capt2,fill='black')
-                app.can.itemconfigure(app.capt3,fill='black')
-                app.can.itemconfigure(app.capt4,fill='black')
+            try:
+                if ord(self.sensorValue) == 0:
+                    app.can.itemconfigure(app.capt1,fill='black')
+                    app.can.itemconfigure(app.capt2,fill='black')
+                    app.can.itemconfigure(app.capt3,fill='black')
+                    app.can.itemconfigure(app.capt4,fill='black')
+                    ## control the robot here
+                if ord(self.sensorValue) == 1:
+                    app.can.itemconfigure(app.capt1,fill='red')
+                    app.can.itemconfigure(app.capt2,fill='black')
+                    app.can.itemconfigure(app.capt3,fill='black')
+                    app.can.itemconfigure(app.capt4,fill='black')
 
-            if ord(self.sensorValue) == 2:
-                app.can.itemconfigure(app.capt1,fill='black')
-                app.can.itemconfigure(app.capt2,fill='red')
-                app.can.itemconfigure(app.capt3,fill='black')
-                app.can.itemconfigure(app.capt4,fill='black')
+                if ord(self.sensorValue) == 2:
+                    app.can.itemconfigure(app.capt1,fill='black')
+                    app.can.itemconfigure(app.capt2,fill='red')
+                    app.can.itemconfigure(app.capt3,fill='black')
+                    app.can.itemconfigure(app.capt4,fill='black')
 
-            if ord(self.sensorValue) == 3:
-                app.can.itemconfigure(app.capt1,fill='black')
-                app.can.itemconfigure(app.capt2,fill='black')
-                app.can.itemconfigure(app.capt3,fill='red')
-                app.can.itemconfigure(app.capt4,fill='black')
+                if ord(self.sensorValue) == 3:
+                    app.can.itemconfigure(app.capt1,fill='black')
+                    app.can.itemconfigure(app.capt2,fill='black')
+                    app.can.itemconfigure(app.capt3,fill='red')
+                    app.can.itemconfigure(app.capt4,fill='black')
+                    
+            except:
+                app.text.insert(END, "ERROR: Bad serial port found\n")
+                
                 
         app.text.insert(END, "End of " + self.threadID + " thread\n")
         s1.acquire()
@@ -192,6 +205,8 @@ class Interface(Frame):
         self.pack()
         self.initializeGUI()
         self.threadsRunning = 0
+        self.CommFound = 0
+        self.FirtsTryComm = 0
         return
 
     ## GUI Config
@@ -245,22 +260,39 @@ class Interface(Frame):
     ## System config
     def initSystem(self):
         # Create new thread
-        global thread1
-        global thread2
-        thread1 = ManagerCommThread("CommWatcher")
-        thread2 = RobotControl("ControlRobot")
+        if self.FirtsTryComm == 0:
+            global thread1
+            global thread2
+            thread1 = ManagerCommThread("CommWatcher")
+            thread1.comm.findPort()
+            thread2 = RobotControl("ControlRobot")
+            self.FirtsTryComm = 1
+        else:
+            thread1.comm.findPort()
+            
+        s1.acquire()
         self.threadsRunning = 1
+        s1.release()
+
     
     def start(self):
         s1.acquire()
         if self.threadsRunning == 0:
             s1.release()
             self.initSystem()
-            thread1.start()
-            thread2.start()
-            app.text.insert(END, "Serial port found: " + thread1.comm.name + "\n")
-            app.text.insert(END, "Thread " + thread1.threadID + " is ready\n")
-            app.text.insert(END, "Thread " + thread2.threadID + " is ready\n")
+            s2.acquire()
+            if self.CommFound == 1:
+                s2.release()
+                thread1.start()
+                thread2.start()
+                app.text.insert(END, "Serial port found: " + thread1.comm.name + "\n")
+                app.text.insert(END, "Thread " + thread1.threadID + " is ready\n")
+                app.text.insert(END, "Thread " + thread2.threadID + " is ready\n")
+            else:
+                s2.release()
+                s1.acquire()
+                self.threadsRunning = 0
+                s1.release()
         else:
             s1.release()
             self.text.insert(END, "All threads are already running\n")
@@ -274,6 +306,11 @@ class Interface(Frame):
             thread1.stop()
             thread2.stop()
             thread1.comm.close()
+            self.FirtsTryComm = 0
+            app.can.itemconfigure(app.capt1,fill='red')
+            app.can.itemconfigure(app.capt2,fill='red')
+            app.can.itemconfigure(app.capt3,fill='red')
+            app.can.itemconfigure(app.capt4,fill='red')
         else:
             s1.release()
             self.text.insert(END, "All threads are already stopped\n")
@@ -301,6 +338,7 @@ class Interface(Frame):
 #Semaphores
 s = threading.Semaphore()
 s1 = threading.Semaphore()
+s2 = threading.Semaphore()
 #GUI
 mainWindow = Tk()
 mainWindow.title("BE Systèmes Autonomes")
@@ -309,6 +347,8 @@ app.text.insert(END, "Main app thread is ready\n")
 app.mainloop()
 
 # if quit
+s1.acquire()
 if app.threadsRunning == 1:
     thread1.stop()
     thread2.stop()
+s1.release()
