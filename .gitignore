@@ -6,3 +6,4 @@ NMakefile
 Makefile
 main.err
 PYTHON_SW/lib*
+PYTHON_SW/Robot_Manager/*
