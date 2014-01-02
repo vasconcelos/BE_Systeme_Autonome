@@ -13,29 +13,29 @@ class ManagerCommThread(threading.Thread):
         self.comm = SerialComm(9600,2)
         self.comm.findPort()
         s1.acquire()
-        self.running = True
+        self.running = False
         s1.release()
-        print "Thread " + self.threadID + " ready\n"
-        #app.text.insert(END, "Thread1 is ready")
         return
 
     def run(self):
-        print "Thread " + self.threadID + " starting\n"
-        #app.text.insert(END, "Starting" + self.threadID)
+        s1.acquire()
+        self.running = True
+        s1.release()
+        app.text.insert(END, "Starting thread: " + self.threadID + "\n")
         j = 0
-        while j < 5:
-            j += 1
+        while j < 1:
             x = self.comm.read()
             convert = ":".join("{0:x}".format(ord(c)) for c in x)
-            print(self.comm.inWaiting())
             s.release()
             s1.acquire()
             if self.running == False:
-                j = 10
+                j = 2
             s1.release()
-        self.comm.close()
-        print "End of thread: " + self.threadID
-        #app.text.insert((END, "End of thread1"), self.threadID) 
+        app.text.insert(END, "End of " + self.threadID + " thread\n")
+        s1.acquire()
+        app.threadsRunning = 0
+        s1.release()
+        del self
         return
 
     def stop(self):
@@ -51,8 +51,6 @@ class SerialComm(serial.Serial):
         self.baudrate = baudrate
         self.timeout= timeout
         self.port = 0
-        if self.isOpen():
-            self.close()
         return
     
     def findPort(self):
@@ -65,9 +63,6 @@ class SerialComm(serial.Serial):
                 port_founded = 2
             except:
                 self.port = i
-        print "Serial port found :" + self.name
-        #app.text.insert(END, "Serial port found: " + self.name)
-        #app.text.insert(END, "Serial COM openned? " + self.isOpen())
         return
     
 
@@ -77,28 +72,32 @@ class RobotControl(threading.Thread):
         threading.Thread.__init__(self) ## call parent constructor
         self.threadID = threadID
         s1.acquire()
-        self.running = True
+        self.running = False
         s1.release()
-        print "Thread " + self.threadID + " ready\n"
-        #app.text.insert(END,"Thread " + self.threadID + "ready")
         s.acquire()
         return
     
     def run(self):
-        print "Thread " + self.threadID + " starting\n"
-        #app.text.insert(END, "Starting" + self.threadID)
+        s1.acquire()
+        self.running = True
+        s1.release()
+        app.text.insert(END, "Starting thread: " + self.threadID + "\n")
         k = 0
-        while k < 2:
-            k += 1
+        while k < 1:
+            s1.acquire()
             if self.running == False:
-                k = 10
+                k = 2
                 s1.release()
             else:
+                s1.release()
                 s.acquire()
-                print "Read value: ", convert
                 app.text.insert(END, "Converted value: %i\n"  %convert)
-        #app.text.insert(END, "End of " + self.threadID + "thread")
-        print "End of thread: " + self.threadID
+        app.text.insert(END, "End of " + self.threadID + " thread\n")
+        s1.acquire()
+        app.threadsRunning = 0
+        s1.release()
+        s.release()
+        del self
         return
 
     def stop(self):
@@ -112,19 +111,19 @@ class Interface(Frame):
         Frame.__init__(self,master)
         self.pack()
         self.initializeGUI()
-        #self.initSystem()
+        self.threadsRunning = 0
         return
 
     def initializeGUI(self):
         f1 = Frame(self)
         f1.pack(side=LEFT,padx=5)
-        self.START = Button(f1,text="START", bg = "green")#, command = self.start)
+        self.START = Button(f1,text="START", bg = "green", command = self.start)
         self.START.pack(side=TOP,expand=YES,fill=BOTH)
 
-        self.STOP = Button(f1,text="STOP", bg = "red")#, command = self.stop)
+        self.STOP = Button(f1,text="STOP", bg = "red", command = self.stop)
         self.STOP.pack(side=TOP,expand=YES,fill=BOTH)
 
-        self.QUIT = Button(f1,text="QUIT")#, command = self.stop)       
+        self.QUIT = Button(f1,text="QUIT", command = self.quit)       
         self.QUIT.pack(side=TOP,expand=YES,fill=BOTH)
 
         f2 = Frame(self)
@@ -160,28 +159,65 @@ class Interface(Frame):
 
 
     def initSystem(self):
-        pass
+        # Create new thread
+        global thread1
+        global thread2
+        thread1 = ManagerCommThread("CommWatcher")
+        thread2 = RobotControl("ControlRobot")
+        self.threadsRunning = 1
     
     def start(self):
-        self.thread1.start()
-        self.thread2.start()
+        s1.acquire()
+        if self.threadsRunning == 0:
+            s1.release()
+            self.initSystem()
+            thread1.start()
+            thread2.start()
+            app.text.insert(END, "Serial port found: " + thread1.comm.name + "\n")
+            app.text.insert(END, "Thread " + thread1.threadID + " is ready\n")
+            app.text.insert(END, "Thread " + thread2.threadID + " is ready\n")
+        else:
+            s1.release()
+            self.text.insert(END, "All threads are already running\n")
+        return
+
+    def stop(self):
+        s1.acquire()
+        if self.threadsRunning == 1:
+            s1.release()
+            app.text.insert(END, "Stopping threads\n")
+            thread1.stop()
+            thread2.stop()
+            thread1.comm.close()
+        else:
+            s1.release()
+            self.text.insert(END, "All threads are already stopped\n")
+        return
+
+    def quit(self):
+        s1.acquire()
+        if app.threadsRunning == 1:
+            s1.release()
+            self.stop()
+
+        s1.release()
+        mainWindow.destroy()
+        #app.destroy()
+        return
 
 
 ## main app
 convert = 0
 s = threading.Semaphore()
 s1 = threading.Semaphore()
-# Create new thread
-thread1 = ManagerCommThread("CommWatcher")
-thread2 = RobotControl("ControlRobot")
-thread1.start()
-thread2.start()
 mainWindow = Tk()
 mainWindow.title("BE Systèmes Autonomes")
 app = Interface(master = mainWindow)
+app.text.insert(END, "Main app thread is ready\n")
 app.mainloop()
-#app.destroy()
-thread1.stop()
-thread2.stop()
+if app.threadsRunning == 1:
+    thread1.stop()
+    thread2.stop()
 
-print("End of main app")
+#app.text.insert(END, "End of main app\n")
+#app.destroy()
